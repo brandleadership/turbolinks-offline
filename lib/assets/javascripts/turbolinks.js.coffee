@@ -11,7 +11,11 @@ visit = (url) ->
   if browserSupportsPushState && browserIsntBuggy
     cacheCurrentPage()
     reflectNewUrl url
-    fetchReplacement url
+    needsRefresh
+      yes: ->
+        fetchReplacement url
+      no: ->
+        fetchFromLocalStore url
   else
     document.location.href = url
 
@@ -30,11 +34,15 @@ fetchReplacement = (url) ->
 
   xhr.onload = =>
     triggerEvent 'page:receive'
-    
+
     if invalidContent(xhr) or assetsChanged (doc = createDocument xhr.responseText)
       document.location.reload()
     else
-      changePage extractTitleAndBody(doc)...
+      # cache page in local store:
+      localStorage.setItem(safeUrl, xhr.responseText)
+      localStorage.setItem('etag-' + safeUrl, xhr.getResponseHeader('Etag'))
+
+      changePage extractTitleAndBody(doc)
       reflectRedirectedUrl xhr
       if document.location.hash
         document.location.href = document.location.href
@@ -48,17 +56,47 @@ fetchReplacement = (url) ->
 
   xhr.send()
 
+needsRefresh = (callbacks) ->
+  url = document.location.href
+  if localStorage.getItem(url)?
+    headRequest?.abort()
+    headRequest = new XMLHttpRequest
+    headRequest.open 'HEAD', url, true
+    headRequest.setRequestHeader 'Etag', localStorage.getItem('etag-' + url)
+
+    headRequest.onreadystatechange = ->
+      if headRequest.readyState == 4
+        if headRequest.status != 304
+          console.log(headRequest)
+          callbacks.yes()
+        else
+          console.log('page has not changed')
+          callbacks.no()
+
+    headRequest.send()
+  else
+    callbacks.no()
+
+fetchFromLocalStore = (url) ->
+  safeUrl = removeHash url
+  stored_page = localStorage.getItem(safeUrl)
+  changePage(extractTitleAndBody(createDocument stored_page))
+
 fetchHistory = (state) ->
   cacheCurrentPage()
 
-  if page = pageCache[state.position]
-    xhr?.abort()
-    changePage page.title, page.body
-    recallScrollPosition page
-    triggerEvent 'page:restore'
-  else
-    fetchReplacement document.location.href
+  #if page = pageCache[state.position]
+    #xhr?.abort()
+    #changePage page.title, page.body
+    #recallScrollPosition page
+    #triggerEvent 'page:restore'
+  #else
 
+  needsRefresh
+    yes: ->
+      fetchReplacement document.location.href
+    no: ->
+      fetchFromLocalStore document.location.href
 
 cacheCurrentPage = ->
   rememberInitialPage()
@@ -91,15 +129,15 @@ changePage = (title, body, csrfToken, runScripts) ->
   triggerEvent 'page:change'
 
 executeScriptTags = ->
-  scripts = Array::slice.call document.body.getElementsByTagName 'script'
-  for script in scripts when script.type in ['', 'text/javascript']
-    copy = document.createElement 'script'
-    copy.setAttribute attr.name, attr.value for attr in script.attributes
-    copy.appendChild document.createTextNode script.innerHTML
-    { parentNode, nextSibling } = script
-    parentNode.removeChild script
-    parentNode.insertBefore copy, nextSibling
-  return
+  #scripts = Array::slice.call document.body.getElementsByTagName 'script'
+  #for script in scripts when script.type in ['', 'text/javascript']
+    #copy = document.createElement 'script'
+    #copy.setAttribute attr.name, attr.value for attr in script.attributes
+    #copy.appendChild document.createTextNode script.innerHTML
+    #{ parentNode, nextSibling } = script
+    #parentNode.removeChild script
+    #parentNode.insertBefore copy, nextSibling
+  #return
 
 removeNoscriptTags = ->
   noscriptTags = Array::slice.call document.body.getElementsByTagName 'noscript'
