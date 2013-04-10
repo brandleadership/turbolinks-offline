@@ -78,8 +78,12 @@ constrainPageCacheTo = (limit) ->
   return
 
 changePage = (title, body, csrfToken, runScripts) ->
+  content = $(body).find('#main-content').html()
+  #document.documentElement.replaceChild body, document.body
+  # sadly, I had to use jquery here o_O
+  $('#main-content').html(content)
+
   document.title = title
-  document.documentElement.replaceChild body, document.body
   CSRFToken.update csrfToken if csrfToken?
   removeNoscriptTags()
   executeScriptTags() if runScripts
