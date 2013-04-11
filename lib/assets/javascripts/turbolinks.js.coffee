@@ -61,26 +61,34 @@ needsRefresh = (callbacks) ->
   if localStorage.getItem(url)?
     headRequest?.abort()
     headRequest = new XMLHttpRequest
-    headRequest.open 'HEAD', url, true
-    headRequest.setRequestHeader 'Etag', localStorage.getItem('etag-' + url)
+    headRequest.open 'GET', url, true
+    headRequest.setRequestHeader 'Accept', 'text/html, application/xhtml+xml, application/xml'
+    headRequest.setRequestHeader 'X-XHR-Referer', referer
+    headRequest.setRequestHeader 'If-None-Match', localStorage.getItem('etag-' + url)
 
     headRequest.onreadystatechange = ->
       if headRequest.readyState == 4
         if headRequest.status != 304
-          console.log(headRequest)
           callbacks.yes()
         else
-          console.log('page has not changed')
           callbacks.no()
 
     headRequest.send()
   else
-    callbacks.no()
+    callbacks.yes()
 
 fetchFromLocalStore = (url) ->
   safeUrl = removeHash url
   stored_page = localStorage.getItem(safeUrl)
-  changePage(extractTitleAndBody(createDocument stored_page))
+  triggerEvent 'page:receive'
+  doc = createDocument(stored_page)
+  changePage extractTitleAndBody(doc)
+  reflectRedirectedUrl xhr
+  if document.location.hash
+    document.location.href = document.location.href
+  else
+    resetScrollPosition()
+  triggerEvent 'page:load'
 
 fetchHistory = (state) ->
   cacheCurrentPage()
