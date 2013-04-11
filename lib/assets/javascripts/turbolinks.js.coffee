@@ -123,16 +123,20 @@ constrainPageCacheTo = (limit) ->
     pageCache[key] = null if key <= currentState.position - limit
   return
 
-changePage = (title, body, csrfToken, runScripts) ->
-  content = $(body).find('#main-content').html()
-  #document.documentElement.replaceChild body, document.body
-  # sadly, I had to use jquery here o_O
-  $('#main-content').html(content)
+changePage = (newPage) ->
+  containerNode = $(document).find('[data-turbolinks-offline-container]').first()
+  content = $(newPage[1]).find('[data-turbolinks-offline-container]').html()
 
-  document.title = title
-  CSRFToken.update csrfToken if csrfToken?
+  if containerNode?
+    # sadly, I had to use jquery here o_O
+    containerNode.html(content)
+  else
+    document.documentElement.replaceChild body, document.body
+
+  document.title = newPage[0]
+  CSRFToken.update newPage[2] if newPage[2]?
   removeNoscriptTags()
-  executeScriptTags() if runScripts
+  executeScriptTags() if newPage[3]
   currentState = window.history.state
   triggerEvent 'page:change'
 
