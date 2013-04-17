@@ -6,6 +6,8 @@ pageCache      = {}
 createDocument = null
 requestMethod  = document.cookie.match(/request_method=(\w+)/)?[1].toUpperCase() or ''
 xhr            = null
+pageTreeUrl    = '/local_storage_sync'
+url_counter    = { x: 0 }
 
 visit = (url) ->
   if browserSupportsPushState && browserIsntBuggy
@@ -53,6 +55,50 @@ fetchReplacement = (url) ->
   xhr.onerror   = -> document.location.href = url
 
   xhr.send()
+
+prefetchPages = ->
+  if(!localStorage["data_synced"] || localStorage["data_synced"] != "true")
+
+    localStorage.setItem('prefetch-counter', 0)
+
+    xhr?.abort()
+    xhr = new XMLHttpRequest
+    xhr.open 'GET', pageTreeUrl, true
+    xhr.setRequestHeader 'Accept', 'text/html, application/xhtml+xml, application/xml'
+    xhr.setRequestHeader 'X-XHR-Referer', referer
+
+    xhr.onload = =>
+      urls = JSON.parse(xhr.responseText).page_tree
+      url_counter.count = urls.length
+
+      for url in urls
+        prefetchPage(url)
+
+    xhr.send()
+
+logPrefetchCompletion = () ->
+  if url_counter.count == parseInt(localStorage.getItem('prefetch-counter'))
+    localStorage.setItem("data_synced", "true")
+
+prefetchPage = (url) ->
+  # Remove hash from url to ensure IE 10 compatibility
+  safeUrl = removeHash url
+
+  prefetchRequest?.abort()
+  prefetchRequest = new XMLHttpRequest
+  prefetchRequest.open 'GET', safeUrl, true
+  prefetchRequest.setRequestHeader 'Accept', 'text/html, application/xhtml+xml, application/xml'
+  prefetchRequest.setRequestHeader 'X-prefetchRequest-Referer', referer
+
+  prefetchRequest.onload = =>
+    cacheInLocalStore(safeUrl, prefetchRequest)
+
+  prefetchRequest.onloadend = ->
+    prefetchRequest = null
+    localStorage.setItem('prefetch-counter', parseInt(localStorage.getItem('prefetch-counter')) + 1)
+    triggerEvent 'page:prefetched'
+
+  prefetchRequest.send()
 
 cacheInLocalStore = (url, xhr) ->
   localStorage.setItem(url, xhr.responseText)
@@ -310,6 +356,7 @@ ignoreClick = (event, link) ->
 
 initializeTurbolinks = ->
   document.addEventListener 'click', installClickHandlerLast, true
+  document.addEventListener 'page:prefetched', logPrefetchCompletion, true
   window.addEventListener 'popstate', (event) ->
     fetchHistory event.state if event.state?.turbolinks
   , false
@@ -326,4 +373,4 @@ requestMethodIsSafe =
 initializeTurbolinks() if browserSupportsPushState and browserIsntBuggy and requestMethodIsSafe
 
 # Call Turbolinks.visit(url) from client code
-@Turbolinks = { visit }
+@Turbolinks = { visit, prefetchPages }
