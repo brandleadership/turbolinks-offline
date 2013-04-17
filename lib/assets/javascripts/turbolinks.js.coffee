@@ -19,7 +19,6 @@ visit = (url) ->
   else
     document.location.href = url
 
-
 fetchReplacement = (url) ->
   triggerEvent 'page:fetch'
 
@@ -191,7 +190,6 @@ removeHash = (url) ->
     link.href = url
   link.href.replace link.hash, ''
 
-
 triggerEvent = (name) ->
   event = document.createEvent 'Events'
   event.initEvent name, true, true
@@ -264,7 +262,6 @@ browserCompatibleDocumentParser = ->
     unless testDoc?.body?.childNodes.length is 1
       return createDocumentUsingWrite
 
-
 installClickHandlerLast = (event) ->
   unless event.defaultPrevented
     document.removeEventListener 'click', handleClick, false
@@ -276,7 +273,6 @@ handleClick = (event) ->
     if link.nodeName is 'A' and !ignoreClick(event, link)
       visit link.href
       event.preventDefault()
-
 
 extractLink = (event) ->
   link = event.target
@@ -308,7 +304,6 @@ nonStandardClick = (event) ->
 
 ignoreClick = (event, link) ->
   crossOriginLink(link) or anchoredLink(link) or nonHtmlLink(link) or noTurbolink(link) or targetLink(link) or nonStandardClick(event)
-
 
 initializeTurbolinks = ->
   document.addEventListener 'click', installClickHandlerLast, true
