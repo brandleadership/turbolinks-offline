@@ -38,8 +38,7 @@ fetchReplacement = (url) ->
       document.location.reload()
     else
       # cache page in local store:
-      localStorage.setItem(safeUrl, xhr.responseText)
-      localStorage.setItem('etag-' + safeUrl, xhr.getResponseHeader('Etag'))
+      cacheInLocalStore(safeUrl, xhr)
 
       changePage extractTitleAndBody(doc)
       reflectRedirectedUrl xhr
@@ -54,6 +53,10 @@ fetchReplacement = (url) ->
   xhr.onerror   = -> document.location.href = url
 
   xhr.send()
+
+cacheInLocalStore = (url, xhr) ->
+  localStorage.setItem(url, xhr.responseText)
+  localStorage.setItem('etag-' + url, xhr.getResponseHeader('Etag'))
 
 needsRefresh = (callbacks) ->
   url = document.location.href
